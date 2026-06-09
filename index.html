@@ -99,6 +99,23 @@ footer{padding:22px 28px 36px;color:#66758a;font-weight:700}
 /* v19: currency-aware formatter: USD cells keep $ and comma thousands; VND cells keep dot thousands */
 .rate-table td,.note-mini-table td{overflow-wrap:anywhere;word-break:normal;}
 .rate-table td.num{white-space:normal;}
+
+
+/* v20: GitHub Pages layout hardening - keep wide tables scrollable instead of squeezing columns */
+.table-shell{width:100%;overflow:hidden}
+.top-scroll{display:block;overflow-x:auto;overflow-y:hidden;height:16px;scrollbar-gutter:stable;background:#eef5fa}
+.table-scroll{overflow:auto;width:100%;max-width:100%;scrollbar-gutter:stable}
+.rate-table{width:max-content;min-width:100%;table-layout:auto}
+.rate-table td{min-width:132px;max-width:420px;word-break:normal;overflow-wrap:break-word;white-space:normal}
+.rate-table tr:first-child td,.rate-table tr:nth-child(2) td{min-width:132px;word-break:normal;overflow-wrap:normal;white-space:normal}
+.rate-table td:first-child{min-width:78px;max-width:110px;text-align:center}
+.rate-table td.num{min-width:128px;text-align:right;white-space:normal}
+.rate-table td.url-cell{min-width:300px;max-width:380px;overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+.rate-table td[data-short="true"]{min-width:76px;max-width:115px;text-align:center}
+.rate-table td[data-medium="true"]{min-width:150px;max-width:260px}
+.rate-table td[data-long="true"]{min-width:240px;max-width:460px}
+@media(max-width:760px){.rate-table td{min-width:128px}.rate-table td.url-cell{min-width:280px}.table-scroll{max-height:70vh}}
+
 </style>
 </head>
 <body>
@@ -94415,11 +94432,33 @@ function search(q){
   });
   if(first) activate(first);
 }
+function setupTableWidths(table){
+  if(!table || table.dataset.v20Ready==='1') return;
+  const rows=Array.from(table.rows);
+  const firstRow=rows.find(r=>r.cells.length);
+  const colCount=firstRow ? Array.from(firstRow.cells).reduce((n,c)=>n+(parseInt(c.getAttribute('colspan')||'1',10)||1),0) : 0;
+  const minTableWidth=Math.max(table.parentElement?.clientWidth||0, colCount*148);
+  table.style.minWidth=minTableWidth+'px';
+  rows.forEach((row,ri)=>{
+    Array.from(row.cells).forEach((cell,ci)=>{
+      const txt=(cell.textContent||'').trim();
+      const lower=txt.toLowerCase();
+      const span=parseInt(cell.getAttribute('colspan')||'1',10)||1;
+      if(span>1){cell.style.minWidth=(span*150)+'px';}
+      if(lower.includes('link') || lower.includes('website') || txt.includes('http')) cell.classList.add('url-cell');
+      if(/^(stt|đvt|dvt|spot|số mặt|số màn|ngang|cao|usd|vnd)$/i.test(txt) || (ci===0 && txt.length<=5)){cell.dataset.short='true';}
+      else if(txt.length>38){cell.dataset.long='true';}
+      else if(txt.length>14){cell.dataset.medium='true';}
+    });
+  });
+  table.dataset.v20Ready='1';
+}
 function syncScrollBars(){
   $$('.table-shell').forEach(shell=>{
     const top=shell.querySelector('.top-scroll'), body=shell.querySelector('.table-scroll'), inner=top?.firstElementChild, table=shell.querySelector('table');
     if(!top||!body||!inner||!table) return;
-    inner.style.width=table.scrollWidth+'px';
+    setupTableWidths(table);
+    requestAnimationFrame(()=>{inner.style.width=Math.max(table.scrollWidth, body.scrollWidth, body.clientWidth)+'px';});
     top.onscroll=()=>body.scrollLeft=top.scrollLeft;
     body.onscroll=()=>top.scrollLeft=body.scrollLeft;
   });
